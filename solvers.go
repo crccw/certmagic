@@ -268,6 +268,16 @@ func (s *DNS01Solver) Present(ctx context.Context, challenge acme.Challenge) err
 	// https://github.com/caddyserver/caddy/issues/3474
 	activeDNSChallenges.Lock(dnsName)
 
+	resolvers := recursiveNameservers(s.Resolvers)
+
+	// Follow one hop of CNAME record. Although it's possible
+	// to have CNAME record pointing to another CNAME record,
+	// such setup is not recommended for efficiency reasons.
+	dnsName, err := followCName(dnsName, resolvers)
+	if err != nil {
+		return fmt.Errorf("could not query CNAME for domain %q: %v", dnsName, err)
+	}
+
 	zone, err := findZoneByFQDN(dnsName, recursiveNameservers(s.Resolvers))
 	if err != nil {
 		return fmt.Errorf("could not determine zone for domain %q: %v", dnsName, err)

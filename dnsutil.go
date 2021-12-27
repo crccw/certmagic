@@ -328,6 +328,30 @@ func recursiveNameservers(custom []string) []string {
 	return servers
 }
 
+// Follows CNAME record.
+func followCName(fqdn string, nameservers []string) (string, error) {
+	if !strings.HasSuffix(fqdn, ".") {
+		fqdn += "."
+	}
+	cname, err := dnsQuery(fqdn, dns.TypeCNAME, nameservers, true)
+	if err != nil {
+		return "", err
+	}
+	switch cname.Rcode {
+	case dns.RcodeSuccess:
+		canoncialFqdn := updateDomainWithCName(cname, fqdn)
+		if canoncialFqdn == fqdn {
+			return canoncialFqdn, nil
+		}
+		return followCName(canoncialFqdn, nameservers)
+
+	case dns.RcodeNameError:
+		return fqdn, nil
+	default:
+		return "", fmt.Errorf("got error when querying CNAME for domain %q: %v", fqdn, cname.Rcode)
+	}
+}
+
 var defaultNameservers = []string{
 	"8.8.8.8:53",
 	"8.8.4.4:53",
